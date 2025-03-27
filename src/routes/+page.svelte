@@ -1,5 +1,5 @@
 <script>
-  import Workspace from '$lib/components/Workspace.svelte';
+  import Workspace from '$lib/components/utility/Workspace.svelte';
   import { browser } from '$app/environment';
 </script>
 
