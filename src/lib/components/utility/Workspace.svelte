@@ -1,11 +1,11 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { audioContextStore, initializeAudio, isAudioInitialized, getAudioContext } from '$lib/stores/audioStore';
-    import DraggableDevice from './DraggableDevice.svelte';
-    import KickDrumDemo from './KickDrumDemo.svelte';
-    import DelayFX from './DelayFX.svelte';
-    import AudioConnector from './AudioConnector.svelte';
-    import { devices as devicesStore, type Device } from '$lib/stores/deviceStore';
+    import { audioContextStore } from '$lib/stores/audioStore';
+    import DraggableDevice from '$lib/components/utility/DraggableDevice.svelte';
+    import Device from '$lib/components/utility/Device.svelte';
+    import KickDrumDemo from '$lib/components/audio/KickDrum/KickDrumDemo.svelte';
+    import { devices as devicesStore, type Device, addDevice } from '$lib/stores/deviceStore';
+    import { v4 as uuidv4 } from 'uuid'
 
     // --- Audio Context Setup ---
     let audioCtx: AudioContext | undefined;
@@ -13,17 +13,7 @@
         audioCtx = value;
     });
 
-    // --- Device/FX Chain State ---
-    let kickOutputNode: AudioNode | null = null;
-    let delayOutputNode: AudioNode | null = null;
-
-    // Flags to enable/disable effects
-    let useDelay = true;
-
-    // Determine the input for the *next* effect in the chain
-    $: delayInput = kickOutputNode;
     // Determine the final node to connect to destination
-    $: finalNodeToConnect = useDelay ? delayOutputNode : kickOutputNode;
 
     // Handle device movement
     function handleDeviceMove(event: CustomEvent<{ deviceId: string; x: number; y: number }>) {
@@ -78,7 +68,7 @@
     function handleWheel(event: WheelEvent & { currentTarget: HTMLElement }) {
         if (event.ctrlKey || event.metaKey) {
             event.preventDefault();
-            const delta = event.deltaY * -0.01;
+            const delta = event.deltaY * -0.01
             const newZoom = Math.max(0.1, Math.min(2, zoom + delta));
             
             // Zoom around mouse position
@@ -118,31 +108,29 @@
                 currentZoom={zoom}
                 on:move={handleDeviceMove}
                 on:dragend={handleDeviceDragEnd}
-            >
-                {#if device.type === 'KickDrumDemo'}
-                    <KickDrumDemo bind:outputNode={kickOutputNode} />
-
-                    {#if kickOutputNode}
-                        {#if useDelay}
-                            <DelayFX inputNode={delayInput} bind:outputNode={delayOutputNode} />
-                        {/if}
+            >   
+                <Device device={device}>
+                    {#if device.type === 'KickDrumDemo'}
+                        <KickDrumDemo />
                     {/if}
-                {/if}
+                </Device>
             </DraggableDevice>
         {/each}
     </div>
 </button>
 
 {#if audioCtx?.destination}
-    <AudioConnector input={finalNodeToConnect} output={audioCtx.destination} />
+    
 {/if}
 
 <div class="controls-panel">
-    <label>
-        <input type="checkbox" bind:checked={useDelay}>
-        Use Delay
-    </label>
+    <button on:click={() => addDevice({id: uuidv4(), x: 0, y: 0, type: 'KickDrumDemo'})}>+ Add Device</button>
 </div>
+
+
+
+
+
 
 <style>
     .workspace-viewport {

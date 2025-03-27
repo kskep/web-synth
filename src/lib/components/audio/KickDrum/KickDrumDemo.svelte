@@ -4,8 +4,9 @@
     import { KickEngine } from '$lib/audio/KickEngine.js'; // Ensure path is correct
 
     // Export outputNode for FX routing
+    export let inputNode: AudioNode | undefined = undefined;
     export let outputNode: AudioNode | null = null;
-    export let destinationNode: AudioNode | undefined = undefined;
+
 
     let kickEngine: KickEngine | null = null;
     let initialized = false;
@@ -66,11 +67,16 @@
                         isEngineReady = true;
                         outputNode = kickEngine.outputNode;
                         // Connect to provided destination or default to audioContext.destination
-                        if (destinationNode) {
-                            kickEngine.connect(destinationNode);
-                        } else {
-                            kickEngine.connect(ctx.destination);
+                        
+                        if (inputNode) {
+                          inputNode.connect(kickEngine.inputNode);
+                        }else{
+                          kickEngine.connect(ctx.destination)
                         }
+                        if (!inputNode){
+                          kickEngine.connect(ctx.destination);
+                        }
+                        
                         clearInterval(checkReady);
                         // Merge component defaults with engine defaults
                         if (kickEngine.params) {
@@ -127,10 +133,13 @@
                 if (kickEngine?.isReady) {
                     isEngineReady = true;
                     outputNode = kickEngine.outputNode;
-                    // Connect to provided destination or default to audioContext.destination
-                    if (destinationNode) {
-                        kickEngine.connect(destinationNode);
-                    } else {
+                    
+                    if (inputNode) {
+                        inputNode.connect(kickEngine.inputNode);
+                    }else{
+                        kickEngine.connect(ctx.destination)
+                    }
+                    if (!inputNode){
                         kickEngine.connect(ctx.destination);
                     }
                     clearInterval(checkReady);
@@ -149,11 +158,9 @@
 
     onDestroy(() => {
         if (kickEngine) {
-            if (destinationNode) {
-                kickEngine.disconnect(destinationNode);
-            } else {
-                kickEngine.disconnect();
-            }
+           
+            kickEngine.disconnect();
+            
         }
         unsubscribeInitialized();
         console.log('KickDrumDemo destroyed, 808 engine disconnected.');
