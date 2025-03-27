@@ -16,3 +16,8 @@ export const devices = writable<Device[]>([
 export const addDevice = (newDevice: Device) => {
     devices.update(currentDevices => [...currentDevices, newDevice]);
 };
+
+// Function to remove a device from the store
+export const removeDevice = (deviceId: string) => {
+    devices.update(currentDevices => currentDevices.filter(device => device.id !== deviceId));
+};

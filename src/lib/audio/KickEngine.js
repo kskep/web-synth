@@ -15,6 +15,8 @@ export class KickEngine {
     activeNodes = new Set();
     /** @type {GainNode | null} */
     masterGain = null;
+    /** @type {GainNode | null} */
+    inputGain = null;
     /** @type {AudioBuffer | null} */
     _noiseBuffer = null;
 
@@ -27,6 +29,13 @@ export class KickEngine {
         }
         this.audioContext = audioContext;
         this._loadResources();
+    }
+
+    /** Get the input node for receiving audio from other nodes
+     * @returns {AudioNode | null}
+     */
+    get inputNode() {
+        return this.inputGain;
     }
 
     /** Get the output node for connecting to other nodes
@@ -88,8 +97,14 @@ export class KickEngine {
     }
 
     _createBaseGraph() {
+        // Create input and output gain nodes
+        this.inputGain = this.audioContext.createGain();
         this.masterGain = this.audioContext.createGain();
-        this.masterGain.gain.value = this.params.outputGain;
+        
+        // Set initial gains
+        this.inputGain.gain.value = 1.0;
+        this.masterGain.gain.value = this.params?.outputGain ?? 0.7;
+        
         this._noiseBuffer = this._createNoiseBuffer('white');
     }
 
@@ -117,6 +132,11 @@ export class KickEngine {
     }
 
     _connectGraph() {
+        // Connect input gain to custom distortion if available
+        if (this.inputGain && this.customDistortionNode && this.masterGain) {
+            this.inputGain.connect(this.customDistortionNode);
+            this.customDistortionNode.connect(this.masterGain);
+        }
         // Internal connections only - do not connect to destination
         // The parent component will handle final output routing
     }
@@ -184,7 +204,6 @@ export class KickEngine {
         // Body signal path
         bodyOsc.connect(bodyAmpEnv);
         bodyAmpEnv.connect(this.customDistortionNode);
-        this.customDistortionNode.connect(this.masterGain);
 
         // Click signal path
         clickSource.connect(clickHighPass);

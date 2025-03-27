@@ -67,16 +67,13 @@
                         isEngineReady = true;
                         outputNode = kickEngine.outputNode;
                         // Connect to provided destination or default to audioContext.destination
-                        
-                        if (inputNode) {
-                          inputNode.connect(kickEngine.inputNode);
-                        }else{
-                          kickEngine.connect(ctx.destination)
+                        if (inputNode && kickEngine.inputNode) {
+                            inputNode.connect(kickEngine.inputNode);
                         }
-                        if (!inputNode){
-                          kickEngine.connect(ctx.destination);
+                        // Only connect to destination if we're not being used as an FX node
+                        if (!outputNode) {
+                            kickEngine.connect(ctx.destination);
                         }
-                        
                         clearInterval(checkReady);
                         // Merge component defaults with engine defaults
                         if (kickEngine.params) {
@@ -133,13 +130,12 @@
                 if (kickEngine?.isReady) {
                     isEngineReady = true;
                     outputNode = kickEngine.outputNode;
-                    
-                    if (inputNode) {
+                    // Connect to provided destination or default to audioContext.destination
+                    if (inputNode && kickEngine.inputNode) {
                         inputNode.connect(kickEngine.inputNode);
-                    }else{
-                        kickEngine.connect(ctx.destination)
                     }
-                    if (!inputNode){
+                    // Only connect to destination if we're not being used as an FX node
+                    if (!outputNode) {
                         kickEngine.connect(ctx.destination);
                     }
                     clearInterval(checkReady);
@@ -158,9 +154,7 @@
 
     onDestroy(() => {
         if (kickEngine) {
-           
             kickEngine.disconnect();
-            
         }
         unsubscribeInitialized();
         console.log('KickDrumDemo destroyed, 808 engine disconnected.');
@@ -199,30 +193,30 @@
                         <input type="range" id="decay" min="0.05" max="1.5" step="0.005" value={params.decay} on:input={(e) => handleInput('decay', e)}>
                     </div>
                     <div class="control-group">
-                         <label for="pitchDecay">Pitch Decay (s): {params.pitchDecay.toFixed(3)}</label>
-                         <input type="range" id="pitchDecay" min="0.005" max="0.15" step="0.001" value={params.pitchDecay} on:input={(e) => handleInput('pitchDecay', e)}>
-                     </div>
+                        <label for="pitchDecay">Pitch Decay (s): {params.pitchDecay.toFixed(3)}</label>
+                        <input type="range" id="pitchDecay" min="0.01" max="0.2" step="0.001" value={params.pitchDecay} on:input={(e) => handleInput('pitchDecay', e)}>
+                    </div>
                 </div>
             {/if}
 
             {#if activeTab === 'Click'}
                 <div class="control-grid-small">
-                     <div class="control-group">
-                         <label for="click">Click Level: {params.clickLevel.toFixed(2)}</label>
-                         <input type="range" id="click" min="0" max="1.5" step="0.01" value={params.clickLevel} on:input={(e) => handleInput('clickLevel', e)}>
-                     </div>
-                     <div class="control-group">
-                         <label for="clickDecay">Click Decay (s): {params.clickDecay.toFixed(3)}</label>
-                         <input type="range" id="clickDecay" min="0.002" max="0.05" step="0.001" value={params.clickDecay} on:input={(e) => handleInput('clickDecay', e)}>
-                     </div>
-                     <div class="control-group">
-                         <label for="clickFilterFreq">Click Filter (Hz): {params.clickFilterFreq.toFixed(0)}</label>
-                         <input type="range" id="clickFilterFreq" min="500" max="8000" step="50" value={params.clickFilterFreq} on:input={(e) => handleInput('clickFilterFreq', e)}>
-                     </div>
-                     <div class="control-group">
-                         <label for="clickHighPassFreq">Click High Pass (Hz): {params.clickHighPassFreq.toFixed(0)}</label>
-                         <input type="range" id="clickHighPassFreq" min="20" max="200" step="10" value={params.clickHighPassFreq} on:input={(e) => handleInput('clickHighPassFreq', e)}>
-                     </div>
+                    <div class="control-group">
+                        <label for="clickLevel">Click Level: {params.clickLevel.toFixed(2)}</label>
+                        <input type="range" id="clickLevel" min="0" max="1" step="0.01" value={params.clickLevel} on:input={(e) => handleInput('clickLevel', e)}>
+                    </div>
+                    <div class="control-group">
+                        <label for="clickDecay">Click Decay (s): {params.clickDecay.toFixed(3)}</label>
+                        <input type="range" id="clickDecay" min="0.001" max="0.1" step="0.001" value={params.clickDecay} on:input={(e) => handleInput('clickDecay', e)}>
+                    </div>
+                    <div class="control-group">
+                        <label for="clickFilterFreq">Click Filter (Hz): {params.clickFilterFreq.toFixed(0)}</label>
+                        <input type="range" id="clickFilterFreq" min="500" max="8000" step="100" value={params.clickFilterFreq} on:input={(e) => handleInput('clickFilterFreq', e)}>
+                    </div>
+                    <div class="control-group">
+                        <label for="clickHighPassFreq">Click HP (Hz): {params.clickHighPassFreq.toFixed(0)}</label>
+                        <input type="range" id="clickHighPassFreq" min="20" max="500" step="10" value={params.clickHighPassFreq} on:input={(e) => handleInput('clickHighPassFreq', e)}>
+                    </div>
                 </div>
             {/if}
 
@@ -230,31 +224,31 @@
                 <h4>Distortion & Shaping</h4>
                 <div class="control-grid">
                     <div class="control-group">
-                        <label for="distPreGain">Pre-Gain: {params.distPreGain.toFixed(1)}</label>
-                        <input type="range" id="distPreGain" min="0" max="10" step="0.1" value={params.distPreGain} on:input={(e) => handleInput('distPreGain', e)} title="Input gain into the distortion stage">
+                        <label for="distPreGain">Drive: {params.distPreGain.toFixed(1)}</label>
+                        <input type="range" id="distPreGain" min="1" max="10" step="0.1" value={params.distPreGain} on:input={(e) => handleInput('distPreGain', e)}>
+                    </div>
+                    <div class="control-group">
+                        <label for="distMix">Mix: {params.distMix.toFixed(2)}</label>
+                        <input type="range" id="distMix" min="0" max="1" step="0.01" value={params.distMix} on:input={(e) => handleInput('distMix', e)}>
                     </div>
                     <div class="control-group">
                         <label for="distChar">Character: {params.distChar.toFixed(2)}</label>
-                        <input type="range" id="distChar" min="0.01" max="5" step="0.01" value={params.distChar} on:input={(e) => handleInput('distChar', e)} title="Character of the distortion effect">
+                        <input type="range" id="distChar" min="0" max="1" step="0.01" value={params.distChar} on:input={(e) => handleInput('distChar', e)}>
                     </div>
                     <div class="control-group">
-                        <label for="distAlgo">Algorithm: {['Soft Clip', 'Hard Clip', 'Foldback'][params.distAlgo]}</label>
-                        <input type="range" id="distAlgo" min="0" max="2" step="1" value={params.distAlgo} on:input={(e) => handleInput('distAlgo', e)} title="Type of distortion algorithm">
-                    </div>
-                    <div class="control-group">
-                        <label for="distMix">Mix: {(params.distMix * 100).toFixed(0)}%</label>
-                        <input type="range" id="distMix" min="0" max="1" step="0.01" value={params.distMix} on:input={(e) => handleInput('distMix', e)} title="Dry/Wet mix for the distortion effect">
+                        <label for="distAlgo">Algorithm: {params.distAlgo}</label>
+                        <input type="range" id="distAlgo" min="0" max="3" step="1" value={params.distAlgo} on:input={(e) => handleInput('distAlgo', e)}>
                     </div>
                 </div>
             {/if}
 
-             {#if activeTab === 'Output'}
-                 <div class="control-grid-small">
-                     <div class="control-group">
-                         <label for="output">Output Gain: {params.outputGain.toFixed(2)}</label>
-                         <input type="range" id="output" min="0" max="1.0" step="0.01" value={params.outputGain} on:input={(e) => handleInput('outputGain', e)}>
-                     </div>
-                 </div>
+            {#if activeTab === 'Output'}
+                <div class="control-grid-small">
+                    <div class="control-group">
+                        <label for="outputGain">Level: {params.outputGain.toFixed(2)}</label>
+                        <input type="range" id="outputGain" min="0" max="1" step="0.01" value={params.outputGain} on:input={(e) => handleInput('outputGain', e)}>
+                    </div>
+                </div>
             {/if}
         </div>
     {/if}
@@ -274,7 +268,7 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255,255,255,0.1); /* Enhanced shadow */
         border: 1px solid #4b5263; /* Subtle border */
     }
-     h2 {
+    h2 {
         /* Gradient text effect (optional, browser support varies) */
         background: linear-gradient(90deg, #61afef, #c678dd);
         -webkit-background-clip: text;
@@ -285,8 +279,8 @@
         text-align: center;
         margin-bottom: 1em;
         font-weight: 600;
-     }
-     h4 {
+    }
+    h4 {
         color: #98c379;
         margin-top: 0; margin-bottom: 1em;
         text-align: center; font-size: 1em;
@@ -294,10 +288,10 @@
         padding-bottom: 0.5em;
         text-transform: uppercase; /* Style tweak */
         letter-spacing: 0.5px;
-     }
+    }
 
     /* --- Buttons --- */
-     button { /* General button style */
+    button { /* General button style */
         display: inline-block;
         padding: 0.6em 1em;
         margin: 0 0.2em 0.5em 0.2em;
@@ -311,17 +305,17 @@
         background-image: linear-gradient(to bottom, #6a7384, #5c6370);
         color: #dadde2; /* Slightly brighter text */
         text-shadow: 0 1px 1px rgba(0,0,0,0.2);
-     }
+    }
     button:hover:not(:disabled) {
         background-image: linear-gradient(to bottom, #7a8394, #6c7380);
         box-shadow: 0 3px 6px rgba(0,0,0,0.25), inset 0 -1px 1px rgba(0,0,0,0.1);
         transform: translateY(-1px); /* Subtle lift */
     }
-     button:active:not(:disabled) {
+    button:active:not(:disabled) {
         background-image: linear-gradient(to top, #6a7384, #5c6370); /* Invert gradient */
-         box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
-         transform: translateY(0px);
-     }
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+        transform: translateY(0px);
+    }
     button:disabled {
         background-image: linear-gradient(to bottom, #555, #444);
         color: #777; cursor: not-allowed;
@@ -340,20 +334,20 @@
         font-size: 1em;
         font-weight: bold;
     }
-     .trigger-button {
+    .trigger-button {
         /* Red/Orange gradient for trigger */
         background-image: linear-gradient(to bottom, #ef7c85, #e06c75);
         color: white;
         text-shadow: 0 1px 1px rgba(0,0,0,0.3);
-     }
-     .trigger-button:hover:not(:disabled) {
+    }
+    .trigger-button:hover:not(:disabled) {
         background-image: linear-gradient(to bottom, #f08c95, #e17c85);
         box-shadow: 0 4px 8px rgba(224, 108, 117, 0.3), inset 0 -1px 1px rgba(0,0,0,0.1);
-     }
-      .trigger-button:active:not(:disabled) {
+    }
+    .trigger-button:active:not(:disabled) {
         background-image: linear-gradient(to top, #ef7c85, #e06c75);
         box-shadow: inset 0 2px 3px rgba(0,0,0,0.4);
-     }
+    }
 
 
     /* --- Tabs --- */
@@ -363,17 +357,17 @@
         margin-bottom: 1.2em;
         border-bottom: none; /* Remove simple border */
         position: relative;
-         padding-bottom: 3px; /* Space for the active indicator line */
+        padding-bottom: 3px; /* Space for the active indicator line */
     }
-     /* Line below tabs */
+    /* Line below tabs */
     .tabs::after {
-         content: '';
-         position: absolute;
-         bottom: 0;
-         left: 10%; right: 10%;
-         height: 2px;
-         background-color: rgba(171, 178, 191, 0.15);
-         border-radius: 1px;
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 10%; right: 10%;
+        height: 2px;
+        background-color: rgba(171, 178, 191, 0.15);
+        border-radius: 1px;
     }
 
     .tabs button {
@@ -392,16 +386,16 @@
     .tabs button:hover {
         background: none;
         color: #abb2bf;
-         transform: none; /* No lift on tab hover */
-         box-shadow: none;
+        transform: none; /* No lift on tab hover */
+        box-shadow: none;
     }
     .tabs button.active {
         color: #d19a66; /* Active tab text color (Orange/Yellow) */
         font-weight: 600;
         /* Active indicator line using gradient */
-         border-image-source: linear-gradient(to right, #e5c07b, #d19a66);
-         border-image-slice: 1;
-         border-width: 0 0 3px 0; /* Apply border-image to bottom border */
+        border-image-source: linear-gradient(to right, #e5c07b, #d19a66);
+        border-image-slice: 1;
+        border-width: 0 0 3px 0; /* Apply border-image to bottom border */
     }
 
     /* --- Tab Content & Controls --- */
@@ -429,37 +423,37 @@
         border-radius: 3px;
         -webkit-appearance: none; /* Override default look */
         appearance: none;
-         outline: none;
-         border: 1px solid rgba(0,0,0,0.2);
+        outline: none;
+        border: 1px solid rgba(0,0,0,0.2);
     }
     /* --- Range Slider Thumb --- */
-     input[type="range"]::-webkit-slider-thumb {
-         -webkit-appearance: none; appearance: none;
-         width: 16px; height: 16px;
-         background: #dde2e7; /* Light thumb */
-         border-radius: 50%;
-         border: 1px solid rgba(0,0,0,0.3);
-         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-         cursor: pointer;
-         margin-top: -6px; /* Center thumb vertically on track */
-     }
-     input[type="range"]::-moz-range-thumb {
-         width: 15px; height: 15px;
-         background: #dde2e7;
-         border-radius: 50%;
-         border: 1px solid rgba(0,0,0,0.3);
-         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-         cursor: pointer;
-     }
-      input[type="range"]::-ms-thumb {
-         width: 16px; height: 16px;
-         background: #dde2e7;
-         border-radius: 50%;
-         border: 1px solid rgba(0,0,0,0.3);
-         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-         cursor: pointer;
-         /* margin-top needed? */
-     }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 16px; height: 16px;
+        background: #dde2e7; /* Light thumb */
+        border-radius: 50%;
+        border: 1px solid rgba(0,0,0,0.3);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        cursor: pointer;
+        margin-top: -6px; /* Center thumb vertically on track */
+    }
+    input[type="range"]::-moz-range-thumb {
+        width: 15px; height: 15px;
+        background: #dde2e7;
+        border-radius: 50%;
+        border: 1px solid rgba(0,0,0,0.3);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        cursor: pointer;
+    }
+    input[type="range"]::-ms-thumb {
+        width: 16px; height: 16px;
+        background: #dde2e7;
+        border-radius: 50%;
+        border: 1px solid rgba(0,0,0,0.3);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        cursor: pointer;
+        /* margin-top needed? */
+    }
 
 
     /* --- Control Grids --- */
@@ -476,8 +470,8 @@
         .tabs button { font-size: 0.85em; padding: 0.5em 0.6em; }
         label { font-size: 0.8em; }
         .control-grid, .control-grid-small {
-             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Maybe 2 cols fit */
-             gap: 0.8em 1em;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Maybe 2 cols fit */
+            gap: 0.8em 1em;
         }
         h2 { font-size: 1.4em; }
     }
