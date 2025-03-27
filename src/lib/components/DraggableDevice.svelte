@@ -1,48 +1,75 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
 
     export let initialX = 0;
     export let initialY = 0;
     export let deviceId = '';
+    export let currentPanX = 0;
+    export let currentPanY = 0;
+    export let currentZoom = 1;
 
     const dispatch = createEventDispatcher();
 
     let isDragging = false;
     let currentX = initialX;
     let currentY = initialY;
-    let startX = 0;
-    let startY = 0;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let element: HTMLElement;
+
+    onMount(() => {
+        currentX = initialX;
+        currentY = initialY;
+    });
+
+    function viewportToCanvas(clientX: number, clientY: number) {
+        const rect = element.parentElement!.getBoundingClientRect();
+        const viewportX = clientX - rect.left;
+        const viewportY = clientY - rect.top;
+        return {
+            x: (viewportX - currentPanX) / currentZoom,
+            y: (viewportY - currentPanY) / currentZoom
+        };
+    }
 
     function handleMouseDown(event: MouseEvent) {
-        // Only start dragging if the drag handle was clicked
         const target = event.target as HTMLElement;
-        if (!target.classList.contains('drag-handle') && !target.parentElement?.classList.contains('drag-handle')) return;
-        
+        if (!target.closest('.drag-handle')) return;
+
         isDragging = true;
-        startX = event.clientX - currentX;
-        startY = event.clientY - currentY;
+        const canvasMousePos = viewportToCanvas(event.clientX, event.clientY);
+        dragOffsetX = canvasMousePos.x - currentX;
+        dragOffsetY = canvasMousePos.y - currentY;
+
+        element.style.zIndex = '1000';
         event.preventDefault();
+        event.stopPropagation();
     }
 
     function handleMouseMove(event: MouseEvent) {
         if (!isDragging) return;
-        
-        currentX = event.clientX - startX;
-        currentY = event.clientY - startY;
-        
-        dispatch('move', { id: deviceId, x: currentX, y: currentY });
+
+        const canvasMousePos = viewportToCanvas(event.clientX, event.clientY);
+        currentX = canvasMousePos.x - dragOffsetX;
+        currentY = canvasMousePos.y - dragOffsetY;
+
+        dispatch('move', { deviceId, x: currentX, y: currentY });
     }
 
     function handleMouseUp() {
         if (!isDragging) return;
         isDragging = false;
-        dispatch('dragend', { id: deviceId, x: currentX, y: currentY });
+        element.style.zIndex = '1';
+        dispatch('dragend', { deviceId, x: currentX, y: currentY });
     }
+
+    $: transform = `translate(${currentX}px, ${currentY}px)`;
 </script>
 
 <div
+    bind:this={element}
     class="draggable-device"
-    style="left: {currentX}px; top: {currentY}px;"
+    style="transform: {transform}"
     on:mousedown={handleMouseDown}
     role="button"
     tabindex="0"
@@ -70,6 +97,8 @@
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         overflow: hidden;
         min-width: 200px;
+        left: 0;
+        top: 0;
     }
 
     .drag-handle {

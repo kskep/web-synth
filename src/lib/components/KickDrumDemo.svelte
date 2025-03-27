@@ -1,16 +1,36 @@
-<script>
+<script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { audioContextStore, isAudioInitialized, initializeAudio, getAudioContext } from '$lib/stores/audioStore';
     import { KickEngine } from '$lib/audio/KickEngine.js'; // Ensure path is correct
 
-    let kickEngine = null;
+    // Export outputNode for FX routing
+    export let outputNode: AudioNode | null = null;
+    export let destinationNode: AudioNode | undefined = undefined;
+
+    let kickEngine: KickEngine | null = null;
     let initialized = false;
+    let isEngineReady = false;
     let activeTab = 'Main'; // State for currently active tab
 
-    // --- Default Parameters ---
-    // Updated with new conceptual params for Drive/Shape
-    // NOTE: The actual 'KickEngine' needs to be updated to handle these!
-    let params = {
+    interface KickParams {
+        tune: number;
+        decay: number;
+        punch: number;
+        pitchDecay: number;
+        clickLevel: number;
+        clickDecay: number;
+        clickFilterFreq: number;
+        clickHighPassFreq: number;
+        clickNoiseType: 'white' | 'pink';
+        oscType: 'sine' | 'triangle';
+        distPreGain: number;
+        distMix: number;
+        distAlgo: number;
+        distChar: number;
+        outputGain: number;
+    }
+
+    let params: KickParams = {
         // Main
         tune: 50,
         decay: 0.5,
@@ -20,11 +40,15 @@
         clickLevel: 0.8,
         clickDecay: 0.02,
         clickFilterFreq: 3000,
-        // Shape / Distortion (NEW)
-        drive: 50, // Input gain into shaper
-        shapeCharacter: 0.5, // Placeholder for distortion type/curve control
-        distortionAmount: 0.7, // Intensity of shaping
-        mix: 1.0, // Dry/Wet mix for shaping stage (1.0 = 100% wet)
+        clickHighPassFreq: 100,
+        clickNoiseType: 'white',
+        // Oscillator
+        oscType: 'sine',
+        // Distortion
+        distPreGain: 1.0,
+        distMix: 1.0,
+        distAlgo: 0,
+        distChar: 0.5,
         // Output
         outputGain: 0.7
     };
@@ -32,81 +56,116 @@
     const unsubscribeInitialized = isAudioInitialized.subscribe(value => {
         initialized = value;
         if (initialized && !kickEngine) {
-            const ctx = getAudioContext();
-            if (ctx) {
-                kickEngine = new KickEngine(ctx); // Assumes KickEngine constructor is ready
-                // Load initial params *from the engine* if it provides defaults,
-                // otherwise use component defaults. For this example, we assume
-                // the engine might have its own defaults.
-                if (kickEngine.params) {
-                    // Merge component defaults with engine defaults, giving engine priority
-                    // for params it defines, and adding new ones from component.
-                     params = { ...params, ...kickEngine.params };
-                }
+            const maybeCtx = getAudioContext();
+            if (maybeCtx) {
+                const ctx = maybeCtx as AudioContext;
+                kickEngine = new KickEngine(ctx);
+                // Wait for engine to be ready
+                const checkReady = setInterval(() => {
+                    if (kickEngine?.isReady) {
+                        isEngineReady = true;
+                        outputNode = kickEngine.outputNode;
+                        // Connect to provided destination or default to audioContext.destination
+                        if (destinationNode) {
+                            kickEngine.connect(destinationNode);
+                        } else {
+                            kickEngine.connect(ctx.destination);
+                        }
+                        clearInterval(checkReady);
+                        // Merge component defaults with engine defaults
+                        if (kickEngine.params) {
+                            params = { ...params, ...kickEngine.params };
+                        }
+                    }
+                }, 100);
                 console.log('808 KickEngine created.');
             }
         }
     });
 
     function triggerKick() {
-        if (!initialized || !kickEngine) {
+        if (!initialized || !kickEngine || !isEngineReady) {
             if (!initialized) initializeAudio();
             return;
         }
-        kickEngine.trigger(getAudioContext().currentTime);
+        const maybeCtx = getAudioContext();
+        if (maybeCtx) {
+            const ctx = maybeCtx as AudioContext;
+            kickEngine.trigger(ctx.currentTime);
+        }
     }
 
     // Update engine reactively when params change
-    $: if (kickEngine && initialized) {
-        // Pass the *entire* params object, including new ones
+    $: if (kickEngine && initialized && isEngineReady) {
         kickEngine.updateParams(params);
     }
 
     // Helper for slider binding
-    function handleInput(paramName, event) {
-        let value = parseFloat(event.target.value);
-        // Add specific constraints if needed (example for gain/mix)
-        if (['clickLevel', 'outputGain', 'mix', 'distortionAmount'].includes(paramName)) {
-             value = Math.max(0, Math.min(1, value)); // Clamp 0-1
+    function handleInput(paramName: keyof KickParams, event: Event) {
+        const target = event.target as HTMLInputElement;
+        let value = parseFloat(target.value);
+        // Add specific constraints
+        if (['clickLevel', 'outputGain', 'distMix'].includes(paramName)) {
+            value = Math.max(0, Math.min(1, value)); // Clamp 0-1
         }
-         if (['tune', 'punch', 'drive', 'clickFilterFreq'].includes(paramName)) {
-             value = Math.max(0, value); // Ensure non-negative
-         }
+        if (['tune', 'punch', 'clickFilterFreq', 'clickHighPassFreq', 'distPreGain'].includes(paramName)) {
+            value = Math.max(0, value); // Ensure non-negative
+        }
+        if (paramName === 'distAlgo') {
+            value = Math.round(value); // Ensure integer for algorithm type
+        }
         // Update the reactive params object
         params = { ...params, [paramName]: value };
     }
 
     onMount(() => {
-        const ctx = getAudioContext();
-        if (ctx && ctx.state === 'running' && !kickEngine && !initialized) {
-            // If context is already running (e.g. from another component), init engine here
-             kickEngine = new KickEngine(ctx);
-             if (kickEngine.params) {
-                 params = { ...params, ...kickEngine.params };
-             }
-             initialized = true; // Manually set initialized as audioStore might already be true
-             console.log('808 KickEngine created onMount.');
+        const maybeCtx = getAudioContext();
+        if (maybeCtx && !kickEngine && !initialized) {
+            const ctx = maybeCtx as AudioContext;
+            kickEngine = new KickEngine(ctx);
+            const checkReady = setInterval(() => {
+                if (kickEngine?.isReady) {
+                    isEngineReady = true;
+                    outputNode = kickEngine.outputNode;
+                    // Connect to provided destination or default to audioContext.destination
+                    if (destinationNode) {
+                        kickEngine.connect(destinationNode);
+                    } else {
+                        kickEngine.connect(ctx.destination);
+                    }
+                    clearInterval(checkReady);
+                    if (kickEngine.params) {
+                        params = { ...params, ...kickEngine.params };
+                    }
+                    initialized = true;
+                }
+            }, 100);
+            console.log('808 KickEngine created onMount.');
         }
-         // If audio was initialized but engine wasn't (e.g. hot-reload), ensure params match UI
-         else if (kickEngine && initialized) {
-             kickEngine.updateParams(params);
-         }
+        else if (kickEngine && initialized && isEngineReady) {
+            kickEngine.updateParams(params);
+        }
     });
 
     onDestroy(() => {
-        kickEngine?.disconnect(); // Use optional chaining
+        if (kickEngine) {
+            if (destinationNode) {
+                kickEngine.disconnect(destinationNode);
+            } else {
+                kickEngine.disconnect();
+            }
+        }
         unsubscribeInitialized();
         console.log('KickDrumDemo destroyed, 808 engine disconnected.');
     });
-
 </script>
 
 <div class="kick-demo compact">
     <h2>808-Style Kick</h2>
 
-    {#if !initialized}
+    {#if !initialized || !isEngineReady}
         <button on:click={initializeAudio}>Initialize Audio & Kick</button>
-        <p>Click to enable audio.</p>
+        <p>Click to enable audio{#if initialized && !isEngineReady}... Loading engine{/if}</p>
     {:else}
         <button class="trigger-button" on:click={triggerKick}>Trigger Kick</button>
 
@@ -153,30 +212,33 @@
                          <label for="clickFilterFreq">Click Filter (Hz): {params.clickFilterFreq.toFixed(0)}</label>
                          <input type="range" id="clickFilterFreq" min="500" max="8000" step="50" value={params.clickFilterFreq} on:input={(e) => handleInput('clickFilterFreq', e)}>
                      </div>
+                     <div class="control-group">
+                         <label for="clickHighPassFreq">Click High Pass (Hz): {params.clickHighPassFreq.toFixed(0)}</label>
+                         <input type="range" id="clickHighPassFreq" min="20" max="200" step="10" value={params.clickHighPassFreq} on:input={(e) => handleInput('clickHighPassFreq', e)}>
+                     </div>
                 </div>
             {/if}
 
             {#if activeTab === 'Shape'}
-                 <h4>Distortion & Shaping</h4>
-                 <div class="control-grid">
-                     <div class="control-group">
-                         <label for="drive">Drive: {params.drive.toFixed(0)}</label>
-                         <input type="range" id="drive" min="0" max="150" step="1" value={params.drive} on:input={(e) => handleInput('drive', e)} title="Input gain into the shaping stage">
-                     </div>
-                     <div class="control-group">
-                         <label for="distortionAmount">Amount: {params.distortionAmount.toFixed(2)}</label>
-                         <input type="range" id="distortionAmount" min="0" max="1" step="0.01" value={params.distortionAmount} on:input={(e) => handleInput('distortionAmount', e)} title="Intensity of the shaping effect">
-                     </div>
-                      <div class="control-group">
-                         <label for="shapeCharacter">Shape Char: {params.shapeCharacter.toFixed(2)}</label>
-                         <input type="range" id="shapeCharacter" min="0" max="1" step="0.01" value={params.shapeCharacter} on:input={(e) => handleInput('shapeCharacter', e)} title="Character of the waveshaper/distortion (placeholder)">
-                         </div>
-                     <div class="control-group">
-                         <label for="mix">Mix: {(params.mix * 100).toFixed(0)}%</label>
-                         <input type="range" id="mix" min="0" max="1" step="0.01" value={params.mix} on:input={(e) => handleInput('mix', e)} title="Dry/Wet mix for the shaping effect">
-                     </div>
-                 </div>
-
+                <h4>Distortion & Shaping</h4>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label for="distPreGain">Pre-Gain: {params.distPreGain.toFixed(1)}</label>
+                        <input type="range" id="distPreGain" min="0" max="10" step="0.1" value={params.distPreGain} on:input={(e) => handleInput('distPreGain', e)} title="Input gain into the distortion stage">
+                    </div>
+                    <div class="control-group">
+                        <label for="distChar">Character: {params.distChar.toFixed(2)}</label>
+                        <input type="range" id="distChar" min="0.01" max="5" step="0.01" value={params.distChar} on:input={(e) => handleInput('distChar', e)} title="Character of the distortion effect">
+                    </div>
+                    <div class="control-group">
+                        <label for="distAlgo">Algorithm: {['Soft Clip', 'Hard Clip', 'Foldback'][params.distAlgo]}</label>
+                        <input type="range" id="distAlgo" min="0" max="2" step="1" value={params.distAlgo} on:input={(e) => handleInput('distAlgo', e)} title="Type of distortion algorithm">
+                    </div>
+                    <div class="control-group">
+                        <label for="distMix">Mix: {(params.distMix * 100).toFixed(0)}%</label>
+                        <input type="range" id="distMix" min="0" max="1" step="0.01" value={params.distMix} on:input={(e) => handleInput('distMix', e)} title="Dry/Wet mix for the distortion effect">
+                    </div>
+                </div>
             {/if}
 
              {#if activeTab === 'Output'}
