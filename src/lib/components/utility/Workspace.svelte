@@ -4,7 +4,7 @@
     import DraggableDevice from '$lib/components/utility/DraggableDevice.svelte';
     import Device from '$lib/components/utility/Device.svelte';
     import KickDrumDemo from '$lib/components/audio/KickDrum/KickDrumDemo.svelte';
-    import { devices as devicesStore, type Device, addDevice } from '$lib/stores/deviceStore';
+    import { devices as devicesStore, type Device as DeviceType, addDevice } from '$lib/stores/deviceStore';
     import { v4 as uuidv4 } from 'uuid'
 
     // --- Audio Context Setup ---
